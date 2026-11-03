@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tanpa API - Langsung Deploy</title>
+    <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: white; }
+    #chat-box { height: 400px; overflow-y: auto; border: 1px solid #333; padding: 10px; margin-bottom: 10px; background: #222; }
+    #input-area { display: flex; gap: 10px; }
+    input, button { padding: 10px; border-radius: 5px; border: none; }
+    input { flex: 1; }
+    button { background: #007bff; color: white; cursor: pointer; font-weight: bold; }
+    button:disabled { background: #555; }
+   .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; clear: both; }
+   .user { float: right; background: #007bff; color: white; text-align: right; }
+   .ai { float: left; background: #444; color: white; }
+    #status { color: #aaa; font-size: 0.8em; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>🤖 AI Lokal (Tanpa API)</h2>
+    <div id="status">Memuat model AI...</div>
+    <div id="chat-box"></div>
+    <div id="input-area">
+    <input type="text" id="user-input" placeholder="Tulis sesuatu (misal: 'Buatkan kode Python sederhana')..." autocomplete="off">
+    <button id="send-btn" onclick="sendMessage()">Kirim</button>
+   </div>
+
+    <!-- Library dari Hugging Face untuk menjalankan AI di browser -->
+    <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+    // Kunci kunci penting agar tidak mencoba download model lokal, asyik pakai CDN
+    env.allowLocalModels = false;
+    env.useBrowserCache = true;
+
+    let generate;
+    let tokenizer;
+
+    async function loadModel() {
+    updateStatus("Mengunduh model <b>Phi-2</b> (aya pemikiran)...");
+  
+   try {
+    // Memuat pipeline text-generation
+    generate = await pipeline('text-generation', 'Xenova/phi-2', {
+    progress_callback: (status) => {
+    if (status.status === 'progress') {
+    updateStatus(`<br>Progres: ${Math.round(status.progress * 100)}%`);
+   }
+   }
+   });
+  
+    tokenizer = await pipeline('tokenizer', 'Xenova/phi-2');
+
+    updateStatus("Model Siap! Silakan chat.");
+    appendMessage("ai", "Halo! Saya adalah AI berbasis browser. Tanyakan apa saja.");
+    } catch (err) {
+    updateStatus("Gagal memuat model. Pastikan koneksi internet stabil.");
+    console.error(err);
+   }
+  }
+
+    function updateStatus(msg) {
+    document.getElementById('status').innerHTML = msg;
+  }
+
+    window.sendMessage = async function() {
+    const input = document.getElementById('user-input');
+    const btn = document.getElementById('send-btn');
+    const text = input.value.trim();
+
+    if (!text ||!generate) return;
+
+    // UI Updates
+    input.value = '';
+    appendMessage('user', text);
+    btn.disabled = true;
+    updateStatus("AI sedang berpikir...");
+
+   try {
+    // Generate response
+    const output = await generate(text, {
+    max_new_tokens: 150, // Batas panjang jawaban
+    do_sample: true,    // Agar lebih variatif
+    top_k: 50,    // Kriteria variasi
+    temp: 0.5    // Level kreativitas
+  });
+
+    const reply = tokenizer.decode(output[0].output_ids, { skip_special_tokens: true });
+    appendMessage('ai', reply.trim());
+    } catch (err) {
+    console.error(err);
+    appendMessage('ai', "Maaf, terjadi kesalahan dalam memproses pesan Anda.");
+    } finally {
+    btn.disabled = false;
+    updateStatus("Response siap.");
+   }
+  }
+
+    function appendMessage(role, text) {
+    const chatBox = document.getElementById('chat-box');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.innerText = text;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+    // Mulai saat halaman dimuat
+    loadModel();
+    </script>
+</body>
+</html>
